@@ -10,7 +10,7 @@
 
 print-usage() {
     echo "Usage: 
-    rename.sh <directory with files to replace>"
+    rename.sh [--only-show] <directory with files to replace>"
 }
 
 print-requirements() {
@@ -19,10 +19,26 @@ print-requirements() {
 }
 
 rename_all_files_in() {
-    if [ "$#" -ne 1 ]; then
+    if [ "$#" -lt 1 ]; then
         echo "Incorrect number of arguments provided."
         print-usage
         return 1
+    fi
+
+    # Parse options
+    only_show=false
+    if [ "$#" -eq 2 ]; then
+        case "${1}" in
+            --only-show)
+                only_show=true
+                shift 1
+            ;;
+            *)
+            echo "Invalid argument provided: ${1}"
+            print-usage
+            return 1
+            ;;
+        esac
     fi
 
     if $(which tesseract | grep "not found"); then
@@ -32,9 +48,15 @@ rename_all_files_in() {
 
     local -r directory="${1%/}"
 
-    files=(${directory}/*)
+    files=(${directory}/*.*)
 
     echo "Found ${#files} files to rename."
+    if [ ${only_show} = true ]; then
+        echo "Not modifying any files."
+    fi
+
+    # Give some time to react and CTRL+C out of it.
+    sleep 3
 
     for file in "${files[@]}"; do
         filename=$(basename -- "${file}")
@@ -43,8 +65,11 @@ rename_all_files_in() {
         text_in_file="$(tesseract "${file}" stdout -psm 7 -l eng 2> /dev/null)"
         text_in_file=$(echo "${text_in_file}" | sed "s/[\.,\'/-’—:]//g")
         echo "mv \""${file}"\" \""${directory}/${text_in_file}".${extension}\""
-        mv "${file}" "${directory}/${text_in_file}".${extension}
+
+        if [ ${only_show} = false ]; then
+            mv "${file}" "${directory}/${text_in_file}".${extension}
+        fi
     done
 }
 
-rename_all_files_in $1
+rename_all_files_in "${@}"
